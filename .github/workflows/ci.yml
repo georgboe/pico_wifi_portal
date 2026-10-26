@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  host-tests:
+    name: Host tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S tests -B build-tests -DCMAKE_BUILD_TYPE=Debug
+      - name: Build
+        run: cmake --build build-tests -j
+      - name: Test
+        run: ctest --test-dir build-tests --output-on-failure
+
+  examples:
+    name: Examples (${{ matrix.board }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        board: [pico_w, pico2_w]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install toolchain
+        run: sudo apt-get update && sudo apt-get install -y gcc-arm-none-eabi libnewlib-arm-none-eabi libusb-1.0-0-dev
+      - name: Fetch Pico SDK
+        run: git clone --depth 1 --recurse-submodules --shallow-submodules https://github.com/raspberrypi/pico-sdk.git "$RUNNER_TEMP/pico-sdk"
+      - name: Configure
+        run: cmake -S examples -B build-${{ matrix.board }} -DPICO_BOARD=${{ matrix.board }} -DPICO_SDK_PATH="$RUNNER_TEMP/pico-sdk" -DPICOTOOL_FORCE_FETCH_FROM_GIT=ON
+      - name: Build
+        run: cmake --build build-${{ matrix.board }} -j
